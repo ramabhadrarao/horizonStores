@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAppContext } from '../../context/AppContext';
 import { User, KeyRound, Phone, MapPin } from 'lucide-react';
 import Navbar from '../../components/Navbar';
+import toast from 'react-hot-toast';
 
 const Register: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -51,6 +52,7 @@ const Register: React.FC = () => {
       });
       
       if (success) {
+        toast.success('Registration successful');
         navigate('/');
       } else {
         setError('Email already exists or registration failed');

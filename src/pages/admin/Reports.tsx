@@ -7,6 +7,7 @@ import { orderOperations } from '../../db';
 import { Order, ReportData } from '../../types';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import toast from 'react-hot-toast';
 
 // Extend jsPDF to include autoTable
 declare module 'jspdf' {
@@ -25,15 +26,15 @@ const Reports: React.FC = () => {
   const [reportData, setReportData] = useState<ReportData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   
-  const generateReport = () => {
+  const generateReport = async () => {
     if (!startDate || !endDate) {
-      alert('Please select both start and end dates');
+      toast.error('Please select both start and end dates');
       return;
     }
     
-    setIsLoading(true);
-    
     try {
+      setIsLoading(true);
+      
       // Add time to dates to include the entire day
       const startDateTime = new Date(startDate);
       startDateTime.setHours(0, 0, 0, 0);
@@ -41,7 +42,7 @@ const Reports: React.FC = () => {
       const endDateTime = new Date(endDate);
       endDateTime.setHours(23, 59, 59, 999);
       
-      const orders = orderOperations.getOrdersForDateRange(
+      const orders = await orderOperations.getOrdersForDateRange(
         startDateTime.toISOString(),
         endDateTime.toISOString()
       );
@@ -55,9 +56,11 @@ const Reports: React.FC = () => {
         totalRevenue,
         orders
       });
+      
+      toast.success('Report generated successfully');
     } catch (error) {
       console.error('Error generating report:', error);
-      alert('Failed to generate report');
+      toast.error('Failed to generate report');
     } finally {
       setIsLoading(false);
     }
@@ -66,42 +69,49 @@ const Reports: React.FC = () => {
   const downloadPdf = () => {
     if (!reportData) return;
     
-    const doc = new jsPDF();
-    
-    // Add title
-    doc.setFontSize(18);
-    doc.text('Horizon Stores - Sales Report', 14, 22);
-    
-    // Add report period
-    doc.setFontSize(12);
-    doc.text(`Report Period: ${reportData.startDate} to ${reportData.endDate}`, 14, 32);
-    
-    // Add summary
-    doc.text(`Total Orders: ${reportData.totalOrders}`, 14, 42);
-    doc.text(`Total Revenue: ₹${reportData.totalRevenue.toFixed(2)}`, 14, 52);
-    
-    // Add orders table
-    const tableColumn = ['Order ID', 'Customer', 'Date', 'Status', 'Payment', 'Total'];
-    const tableRows = reportData.orders.map(order => [
-      order.id.slice(0, 8),
-      order.user.name,
-      new Date(order.createdAt).toLocaleDateString(),
-      order.status,
-      order.paymentReceived ? 'Received' : 'Pending',
-      `₹${order.total.toFixed(2)}`
-    ]);
-    
-    doc.autoTable({
-      head: [tableColumn],
-      body: tableRows,
-      startY: 62,
-      theme: 'grid',
-      styles: { fontSize: 10 },
-      headStyles: { fillColor: [13, 148, 136] } // Teal color
-    });
-    
-    // Save the PDF
-    doc.save(`HorizonStores_Report_${reportData.startDate}_to_${reportData.endDate}.pdf`);
+    try {
+      const doc = new jsPDF();
+      
+      // Add title
+      doc.setFontSize(18);
+      doc.text('Horizon Stores - Sales Report', 14, 22);
+      
+      // Add report period
+      doc.setFontSize(12);
+      doc.text(`Report Period: ${reportData.startDate} to ${reportData.endDate}`, 14, 32);
+      
+      // Add summary
+      doc.text(`Total Orders: ${reportData.totalOrders}`, 14, 42);
+      doc.text(`Total Revenue: ₹${reportData.totalRevenue.toFixed(2)}`, 14, 52);
+      
+      // Add orders table
+      const tableColumn = ['Order ID', 'Customer', 'Date', 'Status', 'Payment', 'Total'];
+      const tableRows = reportData.orders.map(order => [
+        order.id.slice(0, 8),
+        order.user.name,
+        new Date(order.createdAt).toLocaleDateString(),
+        order.status,
+        order.paymentReceived ? 'Received' : 'Pending',
+        `₹${order.total.toFixed(2)}`
+      ]);
+      
+      doc.autoTable({
+        head: [tableColumn],
+        body: tableRows,
+        startY: 62,
+        theme: 'grid',
+        styles: { fontSize: 10 },
+        headStyles: { fillColor: [13, 148, 136] } // Teal color
+      });
+      
+      // Save the PDF
+      doc.save(`HorizonStores_Report_${reportData.startDate}_to_${reportData.endDate}.pdf`);
+      
+      toast.success('PDF downloaded successfully');
+    } catch (error) {
+      console.error('Error downloading PDF:', error);
+      toast.error('Failed to download PDF');
+    }
   };
   
   // Check for authentication and admin status

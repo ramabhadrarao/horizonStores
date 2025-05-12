@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAppContext } from '../../context/AppContext';
 import { User, KeyRound } from 'lucide-react';
 import Navbar from '../../components/Navbar';
+import toast from 'react-hot-toast';
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -22,6 +23,7 @@ const Login: React.FC = () => {
       const success = await login(email, password);
       
       if (success) {
+        toast.success('Login successful');
         navigate('/');
       } else {
         setError('Invalid email or password');

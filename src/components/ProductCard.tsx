@@ -2,6 +2,7 @@ import React from 'react';
 import { Product } from '../types';
 import { useAppContext } from '../context/AppContext';
 import { ShoppingCart, Edit } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 interface ProductCardProps {
   product: Product;
@@ -21,12 +22,24 @@ const ProductCard: React.FC<ProductCardProps> = ({
     ((product.mrp - product.horizonPrice) / product.mrp) * 100
   );
   
-  const handleAddToCart = () => {
-    if (!isAuthenticated || !cart) return;
+  const handleAddToCart = async () => {
+    if (!isAuthenticated || !cart) {
+      toast.error('You need to be logged in to add items to cart');
+      return;
+    }
     
-    const cartOperations = require('../db').cartOperations;
-    cartOperations.addToCart(cart.id, product.id, 1);
-    refreshCart();
+    try {
+      await import('../db').then(module => {
+        const cartOperations = module.cartOperations;
+        cartOperations.addToCart(cart.id, product.id, 1);
+      });
+      
+      await refreshCart();
+      toast.success(`${product.name} added to cart`);
+    } catch (error) {
+      console.error('Error adding to cart:', error);
+      toast.error('Failed to add item to cart');
+    }
   };
   
   return (

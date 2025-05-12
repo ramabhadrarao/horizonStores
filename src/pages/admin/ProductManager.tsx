@@ -41,10 +41,17 @@ const ProductManager: React.FC = () => {
     loadProducts();
   }, [isAuthenticated, isAdmin, navigate]);
   
-  const loadProducts = () => {
-    const allProducts = productOperations.getProducts();
-    setProducts(allProducts);
-    setIsLoading(false);
+  const loadProducts = async () => {
+    try {
+      setIsLoading(true);
+      const allProducts = await productOperations.getProducts();
+      setProducts(allProducts);
+    } catch (error) {
+      console.error('Error loading products:', error);
+      toast.error('Failed to load products');
+    } finally {
+      setIsLoading(false);
+    }
   };
   
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -73,7 +80,7 @@ const ProductManager: React.FC = () => {
     setEditingProduct(null);
   };
   
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     try {
@@ -84,18 +91,18 @@ const ProductManager: React.FC = () => {
           ...formData
         };
         
-        productOperations.updateProduct(updatedProduct);
+        await productOperations.updateProduct(updatedProduct);
         toast.success('Product updated successfully');
       } else {
         // Add new product
-        productOperations.addProduct(formData);
+        await productOperations.addProduct(formData);
         toast.success('Product added successfully');
       }
       
       // Reset form and refresh product list
       resetForm();
       setShowAddForm(false);
-      loadProducts();
+      await loadProducts();
     } catch (error) {
       console.error('Error saving product:', error);
       toast.error('Failed to save product');
@@ -126,13 +133,13 @@ const ProductManager: React.FC = () => {
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
-      complete: (results) => {
+      complete: async (results) => {
         try {
           const data = results.data as any[];
           let successCount = 0;
           
-          data.forEach((row) => {
-            if (!row.name || !row.imageUrl) return;
+          for (const row of data) {
+            if (!row.name || !row.imageUrl) continue;
             
             const product = {
               name: row.name,
@@ -144,12 +151,12 @@ const ProductManager: React.FC = () => {
               inStock: row.inStock === 'true'
             };
             
-            productOperations.addProduct(product);
+            await productOperations.addProduct(product);
             successCount++;
-          });
+          }
           
           toast.success(`Imported ${successCount} products successfully`);
-          loadProducts();
+          await loadProducts();
           
           // Reset file input
           if (fileInputRef.current) {

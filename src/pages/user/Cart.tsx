@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAppContext } from '../../context/AppContext';
 import { ShoppingCart, Trash2, Plus, Minus, ArrowRight } from 'lucide-react';
@@ -10,6 +10,7 @@ const Cart: React.FC = () => {
   const { state, refreshCart } = useAppContext();
   const { user, cart, isAuthenticated } = state;
   const navigate = useNavigate();
+  const [isProcessing, setIsProcessing] = useState(false);
   
   useEffect(() => {
     if (!isAuthenticated) {
@@ -18,30 +19,43 @@ const Cart: React.FC = () => {
     refreshCart();
   }, [isAuthenticated, navigate, refreshCart]);
   
-  const updateQuantity = (itemId: string, newQuantity: number) => {
+  const updateQuantity = async (itemId: string, newQuantity: number) => {
     if (newQuantity < 1) return;
     
-    cartOperations.updateCartItem(itemId, newQuantity);
-    refreshCart();
+    try {
+      await cartOperations.updateCartItem(itemId, newQuantity);
+      await refreshCart();
+    } catch (error) {
+      console.error('Error updating quantity:', error);
+      toast.error('Failed to update quantity');
+    }
   };
   
-  const removeItem = (itemId: string) => {
-    cartOperations.removeCartItem(itemId);
-    refreshCart();
-    toast.success('Item removed from cart');
+  const removeItem = async (itemId: string) => {
+    try {
+      await cartOperations.removeCartItem(itemId);
+      await refreshCart();
+      toast.success('Item removed from cart');
+    } catch (error) {
+      console.error('Error removing item:', error);
+      toast.error('Failed to remove item');
+    }
   };
   
-  const checkout = () => {
+  const checkout = async () => {
     if (!user || !cart || cart.items.length === 0) return;
     
     try {
-      orderOperations.createOrder(user.id, cart.items);
-      refreshCart();
+      setIsProcessing(true);
+      await orderOperations.createOrder(user.id, cart.items);
+      await refreshCart();
       toast.success('Order placed successfully!');
       navigate('/orders');
     } catch (error) {
       console.error('Checkout error:', error);
       toast.error('Failed to place order');
+    } finally {
+      setIsProcessing(false);
     }
   };
   
@@ -203,9 +217,21 @@ const Cart: React.FC = () => {
                   
                   <button
                     onClick={checkout}
-                    className="w-full mt-6 py-3 bg-teal-600 text-white rounded-md font-medium hover:bg-teal-700 transition-colors"
+                    disabled={isProcessing}
+                    className={`w-full mt-6 py-3 ${
+                      isProcessing 
+                        ? 'bg-gray-400 cursor-not-allowed' 
+                        : 'bg-teal-600 hover:bg-teal-700'
+                    } text-white rounded-md font-medium transition-colors`}
                   >
-                    Place Order
+                    {isProcessing ? (
+                      <span className="flex items-center justify-center">
+                        <span className="animate-spin h-5 w-5 mr-2 border-t-2 border-b-2 border-white rounded-full"></span>
+                        Processing...
+                      </span>
+                    ) : (
+                      'Place Order'
+                    )}
                   </button>
                 </div>
               </div>

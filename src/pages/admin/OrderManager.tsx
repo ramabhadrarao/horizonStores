@@ -26,16 +26,23 @@ const OrderManager: React.FC = () => {
     loadOrders();
   }, [isAuthenticated, isAdmin, navigate]);
   
-  const loadOrders = () => {
-    const allOrders = orderOperations.getOrders();
-    setOrders(allOrders);
-    setIsLoading(false);
+  const loadOrders = async () => {
+    try {
+      setIsLoading(true);
+      const allOrders = await orderOperations.getOrders();
+      setOrders(allOrders);
+    } catch (error) {
+      console.error('Error loading orders:', error);
+      toast.error('Failed to load orders');
+    } finally {
+      setIsLoading(false);
+    }
   };
   
-  const handleStatusChange = (orderId: string, status: 'pending' | 'completed') => {
+  const handleStatusChange = async (orderId: string, status: 'pending' | 'completed') => {
     try {
-      orderOperations.updateOrderStatus(orderId, status);
-      loadOrders();
+      await orderOperations.updateOrderStatus(orderId, status);
+      await loadOrders();
       
       if (selectedOrder && selectedOrder.id === orderId) {
         setSelectedOrder({ ...selectedOrder, status });
@@ -48,10 +55,10 @@ const OrderManager: React.FC = () => {
     }
   };
   
-  const handlePaymentChange = (orderId: string, received: boolean) => {
+  const handlePaymentChange = async (orderId: string, received: boolean) => {
     try {
-      orderOperations.updatePaymentStatus(orderId, received);
-      loadOrders();
+      await orderOperations.updatePaymentStatus(orderId, received);
+      await loadOrders();
       
       if (selectedOrder && selectedOrder.id === orderId) {
         setSelectedOrder({ ...selectedOrder, paymentReceived: received });

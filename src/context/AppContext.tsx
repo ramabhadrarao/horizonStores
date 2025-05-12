@@ -1,13 +1,14 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, Cart, AppState } from '../types';
 import { userOperations, cartOperations } from '../db';
+import toast from 'react-hot-toast';
 
 interface AppContextProps {
   state: AppState;
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
   register: (user: Omit<User, 'id' | 'isAdmin' | 'createdAt'>) => Promise<boolean>;
-  refreshCart: () => void;
+  refreshCart: () => Promise<void>;
 }
 
 const initialState: AppState = {
@@ -22,42 +23,52 @@ const AppContext = createContext<AppContextProps>({
   login: async () => false,
   logout: () => {},
   register: async () => false,
-  refreshCart: () => {}
+  refreshCart: async () => {}
 });
 
 export const useAppContext = () => useContext(AppContext);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [state, setState] = useState<AppState>(initialState);
+  const [isInitializing, setIsInitializing] = useState(true);
 
   // Check for saved user session on load
   useEffect(() => {
-    const savedUser = localStorage.getItem('horizonUser');
-    if (savedUser) {
-      try {
-        const user = JSON.parse(savedUser) as User;
-        setState({
-          user,
-          cart: null,
-          isAuthenticated: true,
-          isAdmin: user.isAdmin
-        });
-        
-        // Fetch cart data after restoring session
-        if (user && !user.isAdmin) {
-          const cart = cartOperations.getCart(user.id);
-          setState(prev => ({ ...prev, cart }));
+    const restoreSession = async () => {
+      const savedUser = localStorage.getItem('horizonUser');
+      if (savedUser) {
+        try {
+          const user = JSON.parse(savedUser) as User;
+          setState({
+            user,
+            cart: null,
+            isAuthenticated: true,
+            isAdmin: user.isAdmin
+          });
+          
+          // Fetch cart data after restoring session for non-admin users
+          if (user && !user.isAdmin) {
+            try {
+              const cart = await cartOperations.getCart(user.id);
+              setState(prev => ({ ...prev, cart }));
+            } catch (error) {
+              console.error('Failed to fetch cart:', error);
+            }
+          }
+        } catch (error) {
+          console.error('Failed to restore session:', error);
+          localStorage.removeItem('horizonUser');
         }
-      } catch (error) {
-        console.error('Failed to restore session:', error);
-        localStorage.removeItem('horizonUser');
       }
-    }
+      setIsInitializing(false);
+    };
+
+    restoreSession();
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
-      const user = userOperations.getUserByEmail(email);
+      const user = await userOperations.getUserByEmail(email);
       
       if (user && user.password === password) {
         // In a real app, we would never store the password in localStorage
@@ -68,7 +79,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // Fetch cart for regular users
         let cart = null;
         if (!user.isAdmin) {
-          cart = cartOperations.getCart(user.id);
+          cart = await cartOperations.getCart(user.id);
         }
         
         setState({
@@ -96,19 +107,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const register = async (userData: Omit<User, 'id' | 'isAdmin' | 'createdAt'>): Promise<boolean> => {
     try {
       // Check if user already exists
-      const existingUser = userOperations.getUserByEmail(userData.email);
+      const existingUser = await userOperations.getUserByEmail(userData.email);
       if (existingUser) {
         return false;
       }
       
       // Create new user
-      const newUser = userOperations.createUser(userData);
+      const newUser = await userOperations.createUser(userData);
       
       // Auto login after registration
       localStorage.setItem('horizonUser', JSON.stringify(newUser));
       
       // Create an empty cart for the new user
-      const cart = cartOperations.getCart(newUser.id);
+      const cart = await cartOperations.getCart(newUser.id);
       
       setState({
         user: newUser,
@@ -124,12 +135,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const refreshCart = () => {
+  const refreshCart = async () => {
     if (state.user && !state.isAdmin) {
-      const cart = cartOperations.getCart(state.user.id);
-      setState(prev => ({ ...prev, cart }));
+      try {
+        const cart = await cartOperations.getCart(state.user.id);
+        setState(prev => ({ ...prev, cart }));
+      } catch (error) {
+        console.error('Failed to refresh cart:', error);
+        toast.error('Error refreshing cart');
+      }
     }
   };
+
+  // Show a loading indicator while restoring the session
+  if (isInitializing) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-teal-600"></div>
+      </div>
+    );
+  }
 
   return (
     <AppContext.Provider value={{ state, login, logout, register, refreshCart }}>

@@ -15,56 +15,77 @@ const Home: React.FC = () => {
   
   useEffect(() => {
     // Load all products
-    const allProducts = productOperations.getProducts();
-    setProducts(allProducts);
-    setFilteredProducts(allProducts);
+    const fetchProducts = async () => {
+      try {
+        setIsLoading(true);
+        const allProducts = await productOperations.getProducts();
+        setProducts(allProducts);
+        setFilteredProducts(allProducts);
+        
+        // Extract unique categories
+        const uniqueCategories = Array.from(
+          new Set(allProducts.map(p => p.category))
+        ).filter(Boolean) as string[];
+        
+        setCategories(uniqueCategories);
+      } catch (error) {
+        console.error('Error fetching products:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
     
-    // Extract unique categories
-    const uniqueCategories = Array.from(
-      new Set(allProducts.map(p => p.category))
-    ).filter(Boolean);
-    
-    setCategories(uniqueCategories);
-    setIsLoading(false);
+    fetchProducts();
   }, []);
   
-  const handleSearch = (query: string) => {
+  const handleSearch = async (query: string) => {
     setSearchQuery(query);
     
-    if (query.trim() === '') {
-      // If search is cleared, apply only category filter
-      filterByCategory(selectedCategory);
-    } else {
-      // Search by query and respect category filter
-      let results = productOperations.searchProducts(query);
-      
-      // Apply category filter if not 'all'
-      if (selectedCategory !== 'all') {
-        results = results.filter(product => product.category === selectedCategory);
+    try {
+      if (query.trim() === '') {
+        // If search is cleared, apply only category filter
+        filterByCategory(selectedCategory);
+      } else {
+        // Search by query and respect category filter
+        const results = await productOperations.searchProducts(query);
+        
+        // Apply category filter if not 'all'
+        if (selectedCategory !== 'all') {
+          setFilteredProducts(results.filter(product => product.category === selectedCategory));
+        } else {
+          setFilteredProducts(results);
+        }
       }
-      
-      setFilteredProducts(results);
+    } catch (error) {
+      console.error('Error searching products:', error);
     }
   };
   
-  const filterByCategory = (category: string) => {
+  const filterByCategory = async (category: string) => {
     setSelectedCategory(category);
     
-    let filtered = products;
-    
-    // Apply category filter
-    if (category !== 'all') {
-      filtered = filtered.filter(product => product.category === category);
+    try {
+      // Apply category filter
+      if (category !== 'all') {
+        setFilteredProducts(products.filter(product => product.category === category));
+      } else {
+        setFilteredProducts(products);
+      }
+      
+      // Apply search filter if there's a search query
+      if (searchQuery.trim() !== '') {
+        const searchResults = await productOperations.searchProducts(searchQuery);
+        
+        // Filter search results by category if category is not 'all'
+        if (category !== 'all') {
+          setFilteredProducts(searchResults.filter(product => product.category === category));
+        } else {
+          setFilteredProducts(searchResults);
+        }
+      }
+    } catch (error) {
+      console.error('Error filtering products:', error);
     }
-    
-    // Apply search filter if there's a search query
-    if (searchQuery.trim() !== '') {
-      filtered = productOperations.searchProducts(searchQuery).filter(
-        product => filtered.some(p => p.id === product.id)
-      );
-    }
-    
-    setFilteredProducts(filtered);
   };
   
   return (

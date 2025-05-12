@@ -21,9 +21,19 @@ const OrderList: React.FC = () => {
     }
     
     // Load user orders
-    const userOrders = orderOperations.getUserOrders(user.id);
-    setOrders(userOrders);
-    setIsLoading(false);
+    const fetchOrders = async () => {
+      try {
+        setIsLoading(true);
+        const userOrders = await orderOperations.getUserOrders(user.id);
+        setOrders(userOrders);
+      } catch (error) {
+        console.error('Error fetching orders:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchOrders();
   }, [isAuthenticated, user, navigate]);
   
   if (!isAuthenticated || !user) {
